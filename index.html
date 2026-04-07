@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>小熊找妈妈 - 汉泰双语绘本</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body { font-family: 'Noto Sans SC', 'Noto Sans Thai', sans-serif; background: #e9e6df; min-height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .start-card { background: #fef7e0; padding: 2rem 3rem; border-radius: 60px 20px 60px 20px; box-shadow: 0 20px 35px rgba(0,0,0,0.3); text-align: center; cursor: pointer; border: 3px solid #d4af37; }
+        .start-card h2 { font-size: 2.5rem; color: #b85c1a; }
+        .start-card p { font-size: 1.4rem; color: #6b3e1c; }
+        .start-card small { display: block; margin-top: 0.5rem; color: #a5673f; font-size: 0.8rem; }
+        .book-container { display: none; width: 100vw; height: 100vh; position: relative; background: #d9cdb0; overflow: hidden; }
+        .book-wrapper { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; max-width: 1200px; height: 75%; max-height: 85vh; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border-radius: 12px; background: #faf3e0; }
+        #flipbook { width: 100%; height: 100%; }
+        #flipbook .page { background: #fffef7; border-radius: 8px; border: 3px solid #c9aa5f; overflow: hidden; position: relative; }
+        .page-content { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #fef5e6; }
+        .page-content img { max-width: 90%; max-height: 85%; object-fit: contain; display: block; margin: auto; background: white; }
+        /* 移动端优化：缩小图片，增加内边距，减少文字重叠 */
+        @media (max-width: 700px) {
+            .page-content img { max-width: 85%; max-height: 80%; }
+            .page-content { padding: 10px; }
+        }
+        .sound-icon { position: absolute; top: 12px; left: 12px; width: 36px; height: 36px; background: rgba(255,248,225,0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 30; box-shadow: 0 2px 6px rgba(0,0,0,0.2); border: 1px solid #c2a156; }
+        .sound-icon svg { width: 22px; height: 22px; fill: #7c501a; }
+        .controls-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; padding: 12px 20px; background: rgba(48,35,22,0.85); backdrop-filter: blur(8px); border-radius: 50px; z-index: 100; }
+        .ctrl-btn { background: #f3e5c0; border: none; padding: 6px 16px; border-radius: 40px; font-size: 1rem; font-weight: bold; cursor: pointer; font-family: inherit; color: #4a2c12; }
+        .nav-arrow { background: #c9a14b; color: white; }
+        .progress-area { display: flex; align-items: center; gap: 12px; background: #2d241a80; padding: 0 12px; border-radius: 32px; }
+        #progressSlider { width: 180px; cursor: pointer; }
+        .page-indicator { color: #ffefcf; font-weight: bold; min-width: 90px; text-align: center; }
+        .side-drawer { position: fixed; top: 0; left: -320px; width: 300px; height: 100%; background: #fff4e4; z-index: 300; transition: left 0.3s; padding: 20px; border-right: 4px solid #dbb46a; overflow-y: auto; }
+        .side-drawer.open { left: 0; }
+        .drawer-header { font-size: 1.6rem; font-weight: bold; border-bottom: 2px solid #c1a055; display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .drawer-list { list-style: none; }
+        .drawer-list li { padding: 12px; background: #f9efdb; border-radius: 30px; margin: 12px 0; cursor: pointer; border-left: 5px solid #dba43e; transition: 0.2s; }
+        .drawer-list li:hover { background: #eedbaa; transform: translateX(5px); }
+        .close-drawer { background: none; border: none; font-size: 28px; cursor: pointer; color: #8b6942; }
+        .right-buttons { position: absolute; right: 20px; bottom: 20px; display: flex; gap: 12px; z-index: 100; }
+        .catalog-btn { position: absolute; left: 20px; bottom: 20px; background: #b98f4b; color: white; padding: 8px 18px; border-radius: 40px; cursor: pointer; z-index: 100; font-weight: bold; }
+        @media (max-width: 700px) { .controls-bar { gap: 8px; padding: 6px 12px; } .ctrl-btn { padding: 4px 12px; font-size: 0.75rem; } #progressSlider { width: 100px; } }
+    </style>
+</head>
+<body>
+
+<div id="startOverlay" class="start-overlay">
+    <div class="start-card" id="startBtn">
+        <h2>📖 开始阅读</h2>
+        <p>เริ่มอ่านหนังสือ</p>
+        <small>✨ 点击进入绘本世界 ✨</small>
+        <small style="font-size:0.7rem; color:#b85c1a;">💡 提示：若图片文字重叠，建议将SVG中的文字拆分为多行或转换为PNG图片</small>
+    </div>
+</div>
+
+<div id="bookContainer" class="book-container">
+    <div id="drawer" class="side-drawer">
+        <div class="drawer-header"><span>📑 目录 / สารบัญ</span><button class="close-drawer" id="closeDrawerBtn">✕</button></div>
+        <ul id="catalogList" class="drawer-list"></ul>
+    </div>
+    <div class="book-wrapper"><div id="flipbook"></div></div>
+    <div class="controls-bar">
+        <button id="prevBtn" class="ctrl-btn nav-arrow">◀ 上一页 หน้าก่อนหน้า</button>
+        <div class="progress-area"><span id="pageNumDisplay" class="page-indicator">หน้า 1 / 1</span><input type="range" id="progressSlider" min="0" max="100" value="0"></div>
+        <button id="nextBtn" class="ctrl-btn nav-arrow">下一页 หน้าถัดไป ▶</button>
+    </div>
+    <div id="catalogToggle" class="catalog-btn">📚 目录 / สารบัญ</div>
+    <div class="right-buttons">
+        <button id="autoFlipBtn" class="ctrl-btn" style="display:none;">⏵ 自动翻页 เปิดอัตโนมัติ</button>
+        <button id="fullReadBtn" class="ctrl-btn">🔊 全文朗读 อ่านทั้งหมด</button>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// **************** 用户配置区域（请按需修改）******************
+// ============================================================
+const BOOK_CONFIG = {
+    title: "小熊找妈妈",
+    fullAudio: "page0.mp3",   // 完整故事音频路径（全文朗读用）
+    pages: [
+        { img: "page1.svg", audio: "page1.mp3", titleCn: "", titleTh: "", autoDelay: 4 },
+        { img: "page2.svg", audio: "page2.mp3", titleCn: "", titleTh: "", autoDelay: 5 },
+        { img: "page3.svg", audio: "page3.mp3", titleCn: "", titleTh: "", autoDelay: 12 },
+        { img: "page4.svg", audio: "page4.mp3", titleCn: "", titleTh: "", autoDelay: 6 },
+        { img: "page5.svg", audio: "page5.mp3", titleCn: "", titleTh: "", autoDelay: 4 },
+        { img: "page6.svg", audio: "page6.mp3", titleCn: "", titleTh: "", autoDelay: 13 },
+        { img: "page7.svg", audio: "page7.mp3", titleCn: "", titleTh: "", autoDelay: 12 },
+        { img: "page8.svg", audio: "page8.mp3", titleCn: "", titleTh: "", autoDelay: 7 },
+        { img: "page9.svg", audio: "page9.mp3", titleCn: "", titleTh: "", autoDelay: 15 }
+    ],
+    catalog: [
+        { cn: "小熊找妈妈", th: "ลูกหมีน้อยหาแม่", startPage: 1 },
+        { cn: "小熊走失", th: "หมีน้อยพลัดหลง", startPage: 2 },
+        { cn: "小熊过河", th: "หมีน้อยข้ามแม่น้ำ", startPage: 3 },
+        { cn: "小熊上山", th: "หมีน้อยขึ้นเขา", startPage: 6 },
+        { cn: "小熊找到妈妈", th: "หมีน้อยเจอแม่", startPage: 8 },
+        { cn: "小熊和小鸟告别", th: "หมีน้อยลานกน้อย", startPage: 9 }
+    ]
+};
+
+// ========== 以下为引擎代码（已优化移动端音频和图片显示）==========
+const pagesData = BOOK_CONFIG.pages;
+const totalPages = pagesData.length;
+let flipbook = null, currentPage = 1;
+let autoEnabled = false, autoTimer = null;
+let isFullReading = false, fullReadingTimer = null, currentAudio = null;
+let fullReadingAutoTimer = null;
+let savedFullReadingTime = 0;
+let savedFullReadingPage = 1;
+
+function playPageFlipSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 400;
+        gain.gain.value = 0.2;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
+        osc.stop(audioCtx.currentTime + 0.2);
+    } catch(e) {}
+}
+
+function stopAllAudio() {
+    if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+    if (fullReadingTimer) clearTimeout(fullReadingTimer);
+    if (fullReadingAutoTimer) clearTimeout(fullReadingAutoTimer);
+}
+
+// 优化后的单页音频播放（移动端兼容）
+function playPageAudio(pageIndex, onEnd) {
+    // 只停止当前音频，不影响全文朗读的其他状态
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+    }
+    let url = pagesData[pageIndex-1]?.audio;
+    if (!url) { if(onEnd) onEnd(); return; }
+    let audio = new Audio(url);
+    currentAudio = audio;
+    audio.load();  // 预加载，提升移动端响应
+    audio.play().catch(e => {
+        console.warn("单页音频播放失败，可能移动端策略:", e);
+        if(onEnd) onEnd();
+    });
+    audio.onended = () => { if(currentAudio === audio) currentAudio = null; if(onEnd) onEnd(); };
+    audio.onerror = () => { if(currentAudio === audio) currentAudio = null; if(onEnd) onEnd(); };
+}
+
+function updateProgress() {
+    if(!flipbook) return;
+    let page = flipbook.turn('page');
+    currentPage = page;
+    let percent = ((page-1)/(totalPages-1))*100;
+    $('#progressSlider').val(percent);
+    $('#pageNumDisplay').text(`หน้า ${page} / ${totalPages}`);
+}
+
+function refreshPageIcons() {
+    $('.page').each(function() {
+        let pageNum = parseInt($(this).attr('data-page'));
+        if (isNaN(pageNum)) return;
+        $(this).find('.sound-icon').off('click').on('click', (e) => {
+            e.stopPropagation();
+            if (isFullReading) stopFullReading();
+            playPageAudio(pageNum);
+        });
+    });
+}
+
+function scheduleAutoNext() {
+    if (!autoEnabled || isFullReading) return;
+    if (autoTimer) clearTimeout(autoTimer);
+    let delay = pagesData[currentPage-1]?.autoDelay;
+    if (delay === undefined || delay === null) delay = 4;
+    autoTimer = setTimeout(() => {
+        if (!autoEnabled || isFullReading) return;
+        let next = currentPage + 1;
+        if (next <= totalPages && flipbook) {
+            flipbook.turn('next');
+            playPageFlipSound();
+        } else if (next > totalPages) {
+            toggleAutoFlip(false);
+        }
+        autoTimer = null;
+    }, delay * 1000);
+}
+function stopAutoFlip() { if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; } }
+function toggleAutoFlip(enable) {
+    if (enable === undefined) enable = !autoEnabled;
+    if (enable && !autoEnabled) {
+        autoEnabled = true;
+        scheduleAutoNext();
+        $('#autoFlipBtn').css('background', '#f5bc70').html('⏸ 关闭自动翻页');
+    } else if (!enable && autoEnabled) {
+        autoEnabled = false;
+        stopAutoFlip();
+        $('#autoFlipBtn').css('background', '#cfb07c').html('⏵ 自动翻页');
+    }
+}
+
+function stopFullReading() {
+    if (isFullReading) {
+        if (currentAudio && BOOK_CONFIG.fullAudio) {
+            savedFullReadingTime = currentAudio.currentTime;
+            savedFullReadingPage = currentPage;
+        } else {
+            savedFullReadingTime = 0;
+            savedFullReadingPage = currentPage;
+        }
+        isFullReading = false;
+        if (fullReadingTimer) clearTimeout(fullReadingTimer);
+        if (fullReadingAutoTimer) clearTimeout(fullReadingAutoTimer);
+        stopAllAudio();
+        $('#fullReadBtn').css('background', '#cfb07c').html('🔊 全文朗读 อ่านทั้งหมด');
+    }
+}
+
+function startFullReading() {
+    if (isFullReading) { stopFullReading(); return; }
+    if (autoEnabled) toggleAutoFlip(false);
+    stopAllAudio();
+    
+    let hasSavedProgress = (savedFullReadingTime > 0 && savedFullReadingPage >= 1 && savedFullReadingPage <= totalPages);
+    let startPage, startTime;
+    // 如果没有保存的进度，并且当前在最后一页，则从头开始
+    if (!hasSavedProgress && currentPage === totalPages) {
+        startPage = 1;
+        startTime = 0;
+    } else {
+        startPage = hasSavedProgress ? savedFullReadingPage : currentPage;
+        startTime = hasSavedProgress ? savedFullReadingTime : 0;
+    }
+    
+    if (BOOK_CONFIG.fullAudio && BOOK_CONFIG.fullAudio !== "") {
+        isFullReading = true;
+        $('#fullReadBtn').css('background', '#f5bc70').html('⏸ 停止朗读 หยุดอ่าน');
+        
+        let fullAudioObj = new Audio(BOOK_CONFIG.fullAudio);
+        currentAudio = fullAudioObj;
+        if (startTime > 0) fullAudioObj.currentTime = startTime;
+        fullAudioObj.play().catch(e => console.warn("完整音频播放失败，继续翻页", e));
+        fullAudioObj.onended = () => {
+            if (currentAudio === fullAudioObj) currentAudio = null;
+            savedFullReadingTime = 0;
+            savedFullReadingPage = 1;
+        };
+        fullAudioObj.onerror = () => {
+            console.warn("完整音频加载错误，继续翻页");
+            if (currentAudio === fullAudioObj) currentAudio = null;
+        };
+        
+        if (flipbook && startPage !== currentPage) {
+            flipbook.turn('page', startPage);
+        }
+        
+        let currentAutoPage = startPage;
+        function nextPageByDelay() {
+            if (!isFullReading) return;
+            if (currentAutoPage >= totalPages) {
+                savedFullReadingTime = 0;
+                savedFullReadingPage = 1;
+                return;
+            }
+            let delay = pagesData[currentAutoPage-1]?.autoDelay;
+            if (delay === undefined || delay === null) delay = 4;
+            fullReadingAutoTimer = setTimeout(() => {
+                if (!isFullReading) return;
+                if (flipbook && currentAutoPage < totalPages) {
+                    flipbook.turn('next');
+                    playPageFlipSound();
+                    currentAutoPage++;
+                    nextPageByDelay();
+                }
+            }, delay * 1000);
+        }
+        nextPageByDelay();
+    } 
+    else {
+        isFullReading = true;
+        $('#fullReadBtn').css('background', '#f5bc70').html('⏸ 停止朗读 หยุดอ่าน');
+        let cur = startPage;
+        function playSeq() {
+            if (!isFullReading) return;
+            if (cur > totalPages) { stopFullReading(); return; }
+            if (flipbook && flipbook.turn('page') != cur) flipbook.turn('page', cur);
+            setTimeout(() => {
+                if (!isFullReading) return;
+                playPageAudio(cur, () => {
+                    if (!isFullReading) return;
+                    cur++;
+                    fullReadingTimer = setTimeout(playSeq, 500);
+                });
+            }, 300);
+        }
+        playSeq();
+    }
+}
+
+function buildBook() {
+    let $fb = $('#flipbook').empty();
+    for (let i = 0; i < totalPages; i++) {
+        let p = pagesData[i];
+        $fb.append(`
+            <div class="page" data-page="${i+1}">
+                <div class="page-content">
+                    <div class="sound-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></div>
+                    <img src="${p.img}" alt="page${i+1}" style="max-width:90%; max-height:85%;">
+                </div>
+            </div>
+        `);
+    }
+    $fb.turn({
+        width: $fb.parent().width(),
+        height: $fb.parent().height(),
+        autoCenter: true,
+        display: 'single',
+        acceleration: true,
+        when: {
+            turned: function(e, page) {
+                currentPage = page;
+                updateProgress();
+                playPageFlipSound();
+                if (autoEnabled && !isFullReading) scheduleAutoNext();
+                refreshPageIcons();
+            },
+            start: function() {
+                if (autoEnabled && !isFullReading) stopAutoFlip();
+                // 不再自动停止全文朗读，让手动翻页的事件来处理停止
+            }
+        }
+    });
+    flipbook = $fb;
+    $(window).resize(() => { if(flipbook?.turn('is')) flipbook.turn('size', $fb.parent().width(), $fb.parent().height()); });
+    setTimeout(() => { flipbook.turn('page', 1); updateProgress(); refreshPageIcons(); }, 100);
+}
+
+function buildCatalog() {
+    let $list = $('#catalogList').empty();
+    for (let item of BOOK_CONFIG.catalog) {
+        let li = $(`<li data-page="${item.startPage}">📖 ${item.cn} / ${item.th}</li>`);
+        li.on('click', () => {
+            if(flipbook) { 
+                flipbook.turn('page', item.startPage); 
+                $('#drawer').removeClass('open'); 
+                if(isFullReading) stopFullReading(); 
+            }
+        });
+        $list.append(li);
+    }
+}
+
+function initUI() {
+    $('#startBtn').on('click', () => {
+        // 移动端：预先播放一个静音音频，激活音频权限（提升后续音频播放成功率）
+        try {
+            let silentAudio = new Audio();
+            silentAudio.volume = 0;
+            silentAudio.play().catch(e => console.log("静音音频预激活失败", e));
+        } catch(e) {}
+        
+        $('#startOverlay').fadeOut(300, () => {
+            $('#bookContainer').show();
+            buildBook(); 
+            buildCatalog();
+        });
+    });
+    $('#prevBtn').on('click', () => { if(flipbook) { flipbook.turn('previous'); if(isFullReading) stopFullReading(); } });
+    $('#nextBtn').on('click', () => { if(flipbook) { flipbook.turn('next'); if(isFullReading) stopFullReading(); } });
+    $('#progressSlider').on('input', function() {
+        if(!flipbook) return;
+        let percent = $(this).val();
+        let target = Math.round((percent/100)*(totalPages-1)+1);
+        if(target>=1 && target<=totalPages && target!==currentPage) flipbook.turn('page', target);
+        if(isFullReading) stopFullReading();
+    });
+    $('#catalogToggle').on('click', () => $('#drawer').addClass('open'));
+    $('#closeDrawerBtn').on('click', () => $('#drawer').removeClass('open'));
+    $('#fullReadBtn').on('click', () => { 
+        if(autoEnabled) toggleAutoFlip(false); 
+        startFullReading(); 
+    });
+}
+
+$(document).ready(initUI);
+</script>
+</body>
+</html>
